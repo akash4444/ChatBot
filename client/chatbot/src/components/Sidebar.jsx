@@ -53,14 +53,16 @@ export default function Sidebar({
       </ul>
 
       {/* Sticky Bottom */}
-      <div className="p-3 sticky bottom-0 bg-white border-t z-10">
-        <button
-          className="w-full py-2 cursor-pointer rounded bg-red-500 text-white hover:bg-red-600"
-          onClick={clearChats}
-        >
-          Clear Chats
-        </button>
-      </div>
+      {chats?.length > 0 && (
+        <div className="p-3 sticky bottom-0 bg-white border-t z-10">
+          <button
+            className="w-full py-2 cursor-pointer rounded bg-red-500 text-white hover:bg-red-600"
+            onClick={clearChats}
+          >
+            Clear Chats
+          </button>
+        </div>
+      )}
     </div>
   );
 }
