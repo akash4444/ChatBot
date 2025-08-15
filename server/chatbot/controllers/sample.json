@@ -1,0 +1,26 @@
+{
+  "userId": "1",
+  "chatId": "1",
+  "messages": [
+    {
+      "sender": "user",
+      "message": "Hello, how are you?",
+      "timestamp": "2025-08-15T08:00:00.000Z"
+    },
+    {
+      "sender": "bot",
+      "message": "Hello! I am fine, thank you.",
+      "timestamp": "2025-08-15T08:00:01.000Z"
+    },
+    {
+      "sender": "user",
+      "message": "Can you tell me a joke?",
+      "timestamp": "2025-08-15T08:01:00.000Z"
+    },
+    {
+      "sender": "bot",
+      "message": "Why did the developer go broke? Because he used up all his cache!",
+      "timestamp": "2025-08-15T08:01:01.000Z"
+    }
+  ]
+}
