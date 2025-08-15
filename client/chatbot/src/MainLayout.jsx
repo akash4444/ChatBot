@@ -7,13 +7,15 @@ import { socket } from "./socket.js";
 
 export default function App() {
   const [user] = useState({ name: "John Doe", userId: "1" });
-  const [chats, setChats] = useState([]); // [{chatId, messages: []}]
-  const [activeChat, setActiveChat] = useState({}); // {chatId, messages: []}
+  const [chats, setChats] = useState([]);
+  const [activeChat, setActiveChat] = useState({});
+  const [loadingMessages, setLoadingMessages] = useState(false); // loader for fetching messages
+  const [botTyping, setBotTyping] = useState(false); // loader for bot response
 
-  // Initial: fetch chat list, register socket listeners
   useEffect(() => {
     (async () => {
       try {
+        setLoadingMessages(true);
         const res = await fetch(`${BACKEND_URL}/chat/${user.userId}`);
         const data = await res.json();
         const formatted =
@@ -22,10 +24,11 @@ export default function App() {
         if (formatted.length > 0) setActiveChat(formatted[0]);
       } catch (e) {
         console.error("Failed to fetch chat list:", e);
+      } finally {
+        setLoadingMessages(false);
       }
     })();
 
-    // socket listeners
     socket.on("chatCreated", (newChat) => {
       setChats((prev) => [newChat, ...prev]);
       setActiveChat(newChat);
@@ -33,7 +36,6 @@ export default function App() {
     });
 
     socket.on("newMessage", (msg) => {
-      // msg: { chatId, sender, message, timestamp }
       setChats((prev) =>
         prev.map((c) =>
           c.chatId === msg.chatId ? { ...c, messages: [...c.messages, msg] } : c
@@ -44,19 +46,26 @@ export default function App() {
           ? { ...prev, messages: [...(prev.messages || []), msg] }
           : prev
       );
+
+      if (msg.sender === "bot") setBotTyping(false); // stop bot loader
+    });
+
+    socket.on("botTyping", () => {
+      setBotTyping(true); // start bot loader
     });
 
     return () => {
       socket.off("chatCreated");
       socket.off("newMessage");
+      socket.off("botTyping");
     };
   }, []);
 
-  // Load messages when switching chats
   useEffect(() => {
     const load = async () => {
       if (!activeChat?.chatId) return;
       try {
+        setLoadingMessages(true);
         const res = await fetch(
           `${BACKEND_URL}/chat/${user.userId}/${activeChat.chatId}`
         );
@@ -66,6 +75,8 @@ export default function App() {
         socket.emit("joinRoom", activeChat.chatId);
       } catch (e) {
         console.error("Failed to fetch chat messages:", e);
+      } finally {
+        setLoadingMessages(false);
       }
     };
     load();
@@ -77,6 +88,7 @@ export default function App() {
 
   const sendMessage = (chatId, text) => {
     socket.emit("sendMessage", { chatId, userId: user.userId, message: text });
+    setBotTyping(true); // assume bot will reply
   };
 
   return (
@@ -90,7 +102,12 @@ export default function App() {
       <div className="flex flex-col flex-1">
         <Header user={user} onLogout={() => console.log("Logout clicked")} />
         <div className="flex-1 overflow-auto">
-          <ChatWindow activeChat={activeChat} onSend={sendMessage} />
+          <ChatWindow
+            activeChat={activeChat}
+            onSend={sendMessage}
+            loadingMessages={loadingMessages}
+            botTyping={botTyping}
+          />
         </div>
       </div>
     </div>

@@ -4,7 +4,12 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github.css";
 
-export default function ChatWindow({ activeChat, onSend }) {
+export default function ChatWindow({
+  activeChat,
+  onSend,
+  loadingMessages,
+  botTyping,
+}) {
   const [input, setInput] = useState("");
   const [copiedIndex, setCopiedIndex] = useState(null);
   const endRef = useRef(null);
@@ -36,6 +41,12 @@ export default function ChatWindow({ activeChat, onSend }) {
         </h2>
       </div>
 
+      {loadingMessages && (
+        <div className="flex justify-center items-center p-2 text-sm text-gray-500 bg-gray-200 rounded mb-2 animate-pulse">
+          Please wait, getting chat...
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {(activeChat?.messages || []).map((m, idx) => (
@@ -49,7 +60,7 @@ export default function ChatWindow({ activeChat, onSend }) {
           >
             {/* Sender */}
             <div className="text-xs text-gray-500 capitalize mb-1">
-              {m.sender}
+              {m.sender === "bot" ? "AK AI" : "You"}
             </div>
 
             {/* Message */}
@@ -154,6 +165,15 @@ export default function ChatWindow({ activeChat, onSend }) {
             </div>
           </div>
         ))}
+
+        {botTyping && (
+          <div className="flex items-center space-x-1 text-gray-500 text-sm">
+            <span className="animate-bounce">●</span>
+            <span className="animate-bounce delay-100">●</span>
+            <span className="animate-bounce delay-200">●</span>
+            <span>Thinking...</span>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
 
@@ -170,7 +190,7 @@ export default function ChatWindow({ activeChat, onSend }) {
         <button
           className="px-4 py-2 rounded cursor-pointer bg-black text-white disabled:opacity-50 hover:bg-gray-800"
           onClick={handleSend}
-          disabled={!activeChat?.chatId || !input.trim()}
+          disabled={!activeChat?.chatId || !input.trim() || botTyping}
         >
           Send
         </button>

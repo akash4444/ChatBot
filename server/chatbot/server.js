@@ -83,6 +83,7 @@ io.on("connection", (socket) => {
 
       // Emit user message to the room
       io.to(chatId).emit("newMessage", { chatId, ...userMsg });
+      io.to(chatId).emit("botTyping", { chatId });
 
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       // or
@@ -105,6 +106,7 @@ io.on("connection", (socket) => {
 
       // Emit bot message to the room
       io.to(chatId).emit("newMessage", { chatId, ...botMsg });
+      io.to(chatId).emit("botStoppedTyping", { chatId });
     } catch (error) {
       console.error("Error sending message:", error);
       socket.emit("errorEvent", { message: "Failed to send message" });
