@@ -9,29 +9,37 @@ export default function App() {
   const [user] = useState({ name: "John Doe", userId: "1" });
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState({});
-  const [loadingMessages, setLoadingMessages] = useState(false); // loader for fetching messages
-  const [botTyping, setBotTyping] = useState(false); // loader for bot response
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [botTyping, setBotTyping] = useState(false);
 
+  // Fetch chat list on mount
   useEffect(() => {
-    (async () => {
+    const fetchChats = async () => {
       try {
         setLoadingMessages(true);
-        const res = await fetch(`${BACKEND_URL}/chat/${user.userId}`);
+        const res = await fetch(`${BACKEND_URL}/chat/user/${user.userId}`);
         const data = await res.json();
         const formatted =
           data?.data?.map((chatId) => ({ chatId, messages: [] })) || [];
         setChats(formatted);
-        if (formatted.length > 0) setActiveChat(formatted[0]);
+
+        // Set the latest chat active
+        if (formatted.length > 0) {
+          setActiveChat(formatted[0]);
+        }
       } catch (e) {
         console.error("Failed to fetch chat list:", e);
       } finally {
         setLoadingMessages(false);
       }
-    })();
+    };
+    fetchChats();
 
+    // Socket listeners
     socket.on("chatCreated", (newChat) => {
-      setChats((prev) => [newChat, ...prev]);
-      setActiveChat(newChat);
+      const chatData = { chatId: newChat.chatId, messages: [] };
+      setChats((prev) => [chatData, ...prev]);
+      setActiveChat(chatData); // new chat is active
       socket.emit("joinRoom", newChat.chatId);
     });
 
@@ -47,31 +55,29 @@ export default function App() {
           : prev
       );
 
-      if (msg.sender === "bot") setBotTyping(false); // stop bot loader
+      if (msg.sender === "bot") setBotTyping(false);
     });
 
-    socket.on("botTyping", () => {
-      setBotTyping(true); // start bot loader
-    });
+    socket.on("botTyping", () => setBotTyping(true));
 
     return () => {
       socket.off("chatCreated");
       socket.off("newMessage");
       socket.off("botTyping");
     };
-  }, []);
+  }, [user.userId]);
 
+  // Fetch messages whenever activeChat changes
   useEffect(() => {
-    const load = async () => {
+    const loadMessages = async () => {
       if (!activeChat?.chatId) return;
       try {
         setLoadingMessages(true);
         const res = await fetch(
-          `${BACKEND_URL}/chat/${user.userId}/${activeChat.chatId}`
+          `${BACKEND_URL}/chat/user/${user.userId}/chat/${activeChat.chatId}`
         );
         const data = await res.json();
-        const messages = data?.data || [];
-        setActiveChat((prev) => ({ ...prev, messages }));
+        setActiveChat((prev) => ({ ...prev, messages: data?.data || [] }));
         socket.emit("joinRoom", activeChat.chatId);
       } catch (e) {
         console.error("Failed to fetch chat messages:", e);
@@ -79,16 +85,47 @@ export default function App() {
         setLoadingMessages(false);
       }
     };
-    load();
-  }, [activeChat?.chatId]);
+    loadMessages();
+  }, [activeChat?.chatId, user.userId]);
 
-  const startNewChat = () => {
-    socket.emit("createChat", { userId: user.userId });
-  };
+  // Create new chat
+  const startNewChat = () => socket.emit("createChat", { userId: user.userId });
 
+  // Send message
   const sendMessage = (chatId, text) => {
     socket.emit("sendMessage", { chatId, userId: user.userId, message: text });
-    setBotTyping(true); // assume bot will reply
+    setBotTyping(true);
+  };
+
+  // Delete single chat
+  const deleteChat = async (chatId) => {
+    try {
+      await fetch(`${BACKEND_URL}/chat/user/${user.userId}/chat/${chatId}`, {
+        method: "DELETE",
+      });
+      const remainingChats = chats.filter((c) => c.chatId !== chatId);
+      setChats(remainingChats);
+
+      // Set new active chat if deleted chat was active
+      if (activeChat?.chatId === chatId) {
+        setActiveChat(remainingChats.length > 0 ? remainingChats[0] : {});
+      }
+    } catch (error) {
+      console.error("Failed to delete chat:", error);
+    }
+  };
+
+  // Clear all chats
+  const clearAllChats = async () => {
+    try {
+      await fetch(`${BACKEND_URL}/chat/user/${user.userId}`, {
+        method: "DELETE",
+      });
+      setChats([]);
+      setActiveChat({});
+    } catch (error) {
+      console.error("Failed to clear chats:", error);
+    }
   };
 
   return (
@@ -98,6 +135,8 @@ export default function App() {
         activeChat={activeChat}
         setActiveChat={setActiveChat}
         startNewChat={startNewChat}
+        deleteChat={deleteChat}
+        clearChats={clearAllChats}
       />
       <div className="flex flex-col flex-1">
         <Header user={user} onLogout={() => console.log("Logout clicked")} />
