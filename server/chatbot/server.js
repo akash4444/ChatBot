@@ -8,6 +8,10 @@ import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import Chat from "./models/chatModel.js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Initialize Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const app = express();
 
@@ -80,8 +84,12 @@ io.on("connection", (socket) => {
       // Emit user message to the room
       io.to(chatId).emit("newMessage", { chatId, ...userMsg });
 
-      // Create static bot reply
-      const botReplyText = "This is a static bot reply.";
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // or
+      // const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+      const aiResult = await model.generateContent(message);
+      const botReplyText = aiResult.response.text();
       const botMsg = {
         sender: "bot",
         message: botReplyText,

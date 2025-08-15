@@ -10,7 +10,7 @@ export default function Sidebar({
     <div className="w-64 bg-white border-r h-screen overflow-auto">
       <div className="p-3 ">
         <button
-          className="w-full py-2 rounded bg-black text-white"
+          className="w-full py-2 cursor-pointer rounded bg-black text-white"
           onClick={startNewChat}
         >
           + New Chat
