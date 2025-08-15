@@ -4,6 +4,7 @@ import Sidebar from "./components/Sidebar.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import { BACKEND_URL } from "./config/config.js";
 import { socket } from "./socket.js";
+import { Trash2, Menu } from "lucide-react";
 
 export default function App() {
   const [user] = useState({ name: "John Doe", userId: "1" });
@@ -11,6 +12,9 @@ export default function App() {
   const [activeChat, setActiveChat] = useState({});
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [botTyping, setBotTyping] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile sidebar toggle
+
+  const [isOpen, setIsOpen] = useState(false);
 
   // Fetch chat list on mount
   useEffect(() => {
@@ -23,10 +27,7 @@ export default function App() {
           data?.data?.map((chatId) => ({ chatId, messages: [] })) || [];
         setChats(formatted);
 
-        // Set the latest chat active
-        if (formatted.length > 0) {
-          setActiveChat(formatted[0]);
-        }
+        if (formatted.length > 0) setActiveChat(formatted[0]);
       } catch (e) {
         console.error("Failed to fetch chat list:", e);
       } finally {
@@ -39,7 +40,7 @@ export default function App() {
     socket.on("chatCreated", (newChat) => {
       const chatData = { chatId: newChat.chatId, messages: [] };
       setChats((prev) => [chatData, ...prev]);
-      setActiveChat(chatData); // new chat is active
+      setActiveChat(chatData);
       socket.emit("joinRoom", newChat.chatId);
     });
 
@@ -67,7 +68,7 @@ export default function App() {
     };
   }, [user.userId]);
 
-  // Fetch messages whenever activeChat changes
+  // Fetch messages when activeChat changes
   useEffect(() => {
     const loadMessages = async () => {
       if (!activeChat?.chatId) return;
@@ -88,16 +89,12 @@ export default function App() {
     loadMessages();
   }, [activeChat?.chatId, user.userId]);
 
-  // Create new chat
+  // Handlers
   const startNewChat = () => socket.emit("createChat", { userId: user.userId });
-
-  // Send message
   const sendMessage = (chatId, text) => {
     socket.emit("sendMessage", { chatId, userId: user.userId, message: text });
     setBotTyping(true);
   };
-
-  // Delete single chat
   const deleteChat = async (chatId) => {
     try {
       await fetch(`${BACKEND_URL}/chat/user/${user.userId}/chat/${chatId}`, {
@@ -105,8 +102,6 @@ export default function App() {
       });
       const remainingChats = chats.filter((c) => c.chatId !== chatId);
       setChats(remainingChats);
-
-      // Set new active chat if deleted chat was active
       if (activeChat?.chatId === chatId) {
         setActiveChat(remainingChats.length > 0 ? remainingChats[0] : {});
       }
@@ -114,8 +109,6 @@ export default function App() {
       console.error("Failed to delete chat:", error);
     }
   };
-
-  // Clear all chats
   const clearAllChats = async () => {
     try {
       await fetch(`${BACKEND_URL}/chat/user/${user.userId}`, {
@@ -130,6 +123,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
+      {/* Sidebar */}
       <Sidebar
         chats={chats}
         activeChat={activeChat}
@@ -137,9 +131,20 @@ export default function App() {
         startNewChat={startNewChat}
         deleteChat={deleteChat}
         clearChats={clearAllChats}
+        isOpen={sidebarOpen || isOpen}
+        setIsOpen={setSidebarOpen}
+        setIsOpenset={setIsOpen} // Pass toggle to sidebar
       />
+
+      {/* Main Area */}
       <div className="flex flex-col flex-1">
-        <Header user={user} onLogout={() => console.log("Logout clicked")} />
+        <Header
+          user={user}
+          setIsOpen={setIsOpen}
+          isOpen={isOpen}
+          onLogout={() => console.log("Logout clicked")}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} // Optional toggle for mobile
+        />
         <div className="flex-1 overflow-auto">
           <ChatWindow
             activeChat={activeChat}
