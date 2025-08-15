@@ -1,73 +1,60 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-export default function ChatWindow({ activeChat, addMessage }) {
+export default function ChatWindow({ activeChat, onSend }) {
   const [input, setInput] = useState("");
-  const messagesEndRef = useRef(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => scrollToBottom(), [activeChat]);
+  const endRef = useRef(null);
 
   const handleSend = () => {
-    if (!input.trim() || !activeChat) return;
-
-    // Use activeChat.id (not chatId)
-    addMessage(activeChat.id, input, "user");
-
-    // Simulate bot response
-    setTimeout(() => {
-      addMessage(activeChat.id, `Bot reply to: "${input}"`, "bot");
-    }, 500);
-
+    if (!input.trim() || !activeChat?.chatId) return;
+    onSend(activeChat.chatId, input.trim());
     setInput("");
   };
 
-  if (!activeChat) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-gray-400">
-        Start a new chat
-      </div>
-    );
-  }
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [activeChat?.messages?.length, activeChat?.chatId]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      <div className="flex-1 p-4 overflow-y-auto flex flex-col space-y-3">
-        {activeChat?.messages?.map((msg) => (
+    <div className="h-full flex flex-col">
+      <div className="p-3 border-b bg-white">
+        <h2 className="font-semibold">
+          {activeChat?.chatId
+            ? `Chat #${activeChat.chatId}`
+            : "Select or create a chat"}
+        </h2>
+      </div>
+
+      <div className="flex-1 overflow-auto p-4 space-y-3">
+        {(activeChat?.messages || []).map((m, idx) => (
           <div
-            key={msg._id}
-            className={`flex ${
-              msg.sender === "user" ? "justify-end" : "justify-start"
+            key={idx}
+            className={`max-w-[70%] p-2 rounded ${
+              m.sender === "user" ? "ml-auto bg-blue-100" : "bg-gray-200"
             }`}
           >
-            <div
-              className={`p-3 rounded-lg max-w-[70%] break-words ${
-                msg.sender === "user"
-                  ? "bg-blue-500 text-white rounded-br-none"
-                  : "bg-gray-200 text-gray-900 rounded-bl-none"
-              }`}
-            >
-              {msg.message}
+            <div className="text-xs text-gray-500 mb-1">{m.sender}</div>
+            <div>{m.message}</div>
+            <div className="text-[10px] text-gray-400 mt-1">
+              {new Date(m.timestamp).toLocaleTimeString()}
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} />
+        <div ref={endRef} />
       </div>
 
-      <div className="p-4 border-t bg-white flex items-center">
+      <div className="p-3 bg-white border-t flex gap-2">
         <input
-          type="text"
+          className="flex-1 border rounded px-3 py-2"
+          placeholder="Type your message…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1 p-2 border rounded-l-md focus:outline-none focus:ring focus:border-blue-300"
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          disabled={!activeChat?.chatId}
         />
         <button
+          className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
           onClick={handleSend}
-          className="ml-2 bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600"
+          disabled={!activeChat?.chatId}
         >
           Send
         </button>

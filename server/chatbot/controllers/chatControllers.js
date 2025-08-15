@@ -1,4 +1,4 @@
-import Chat from "../model/chat.js";
+import Chat from "../model/chatModel.js";
 
 export const getChatHistoryByChatId = async (req, res) => {
   const { userId, chatId } = req.params;
