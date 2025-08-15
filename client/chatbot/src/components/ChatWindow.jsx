@@ -59,7 +59,15 @@ export default function ChatWindow({
             }`}
           >
             {/* Sender */}
-            <div className="text-xs text-gray-500 capitalize mb-1">
+            <div
+              className={`text-[10px] font-semibold tracking-wide mb-1 px-2 py-0.5 rounded-full inline-block
+    ${
+      m.sender === "bot"
+        ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm"
+        : "text-gray-500"
+    }
+  `}
+            >
               {m.sender === "bot" ? "AK AI" : "You"}
             </div>
 
