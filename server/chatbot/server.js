@@ -5,20 +5,39 @@ import express from "express";
 import http from "http";
 import cors from "cors";
 import { Server } from "socket.io";
+import mongoose from "mongoose";
+
 import connectDB from "./config/db.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import Chat from "./models/chatModel.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// --------------------
+// Global error handlers
+// --------------------
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+// --------------------
 // Initialize Gemini client
+// --------------------
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// --------------------
+// Express + Middleware
+// --------------------
 const app = express();
 
-// Middleware
+const allowedOrigins = process.env.CORS_ORIGIN?.split(",") || [];
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN, // your frontend URL
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
@@ -26,10 +45,14 @@ app.use(
 
 app.use(express.json());
 
+// --------------------
 // Connect to MongoDB
+// --------------------
 connectDB();
 
-// REST routes (for history)
+// --------------------
+// REST routes (history)
+// --------------------
 app.use("/chat", chatRoutes);
 
 // 404 fallback
@@ -37,23 +60,37 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Create HTTP + Socket server
+// --------------------
+// HTTP + Socket.IO Server
+// --------------------
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN?.split(",") || "*",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
   },
 });
 
-// ---- Socket handlers ----
+// --------------------
+// Socket.IO handlers
+// --------------------
 io.on("connection", (socket) => {
   console.log("🔌 Client connected:", socket.id);
 
-  // Create new chat (returns id)
+  // Keep alive ping
+  const pingInterval = setInterval(() => {
+    socket.emit("ping");
+  }, 25000);
+
+  socket.on("disconnect", () => {
+    clearInterval(pingInterval);
+    console.log("❌ Client disconnected:", socket.id);
+  });
+
+  // Create chat
   socket.on("createChat", async ({ userId }) => {
     try {
-      const chatId = Date.now().toString(); // swap with uuid if you prefer
+      const chatId = Date.now().toString(); // or use UUID
       await Chat.create({ userId, chatId, messages: [] });
       socket.emit("chatCreated", { chatId, messages: [] });
       console.log(`🆕 Chat created: ${chatId} for user ${userId}`);
@@ -63,34 +100,39 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Join a room for broadcasting
+  // Join room
   socket.on("joinRoom", (chatId) => {
     socket.join(chatId);
     console.log(`📌 ${socket.id} joined room ${chatId}`);
   });
 
-  // Handle sending a message and return a static bot response
+  // Send message
   socket.on("sendMessage", async ({ chatId, userId, message }) => {
     try {
       const userMsg = { sender: "user", message, timestamp: new Date() };
 
-      // Ensure chat exists and push user message
+      // Save user message
       await Chat.findOneAndUpdate(
         { userId, chatId },
         { $push: { messages: userMsg } },
         { upsert: true }
       );
 
-      // Emit user message to the room
       io.to(chatId).emit("newMessage", { chatId, ...userMsg });
       io.to(chatId).emit("botTyping", { chatId });
 
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      // or
-      // const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      // --------------------
+      // Gemini AI response
+      // --------------------
+      let botReplyText = "Sorry, I couldn't generate a response.";
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const aiResult = await model.generateContent(message);
+        botReplyText = aiResult.response.text();
+      } catch (err) {
+        console.error("Gemini AI error:", err);
+      }
 
-      const aiResult = await model.generateContent(message);
-      const botReplyText = aiResult.response.text();
       const botMsg = {
         sender: "bot",
         message: botReplyText,
@@ -104,7 +146,6 @@ io.on("connection", (socket) => {
         { upsert: true }
       );
 
-      // Emit bot message to the room
       io.to(chatId).emit("newMessage", { chatId, ...botMsg });
       io.to(chatId).emit("botStoppedTyping", { chatId });
     } catch (error) {
@@ -112,12 +153,11 @@ io.on("connection", (socket) => {
       socket.emit("errorEvent", { message: "Failed to send message" });
     }
   });
-
-  socket.on("disconnect", () => {
-    console.log("❌ Client disconnected:", socket.id);
-  });
 });
 
+// --------------------
+// Start server
+// --------------------
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
