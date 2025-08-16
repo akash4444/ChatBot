@@ -1,6 +1,7 @@
 import express from "express";
 import Chat from "../models/chatModel.js";
 import { authMiddleware } from "../middlewares/authMiddlewares.js";
+import { decryptMessage } from "../utils/crypto.js";
 
 const router = express.Router();
 
@@ -45,7 +46,13 @@ router.get("/user/:userId/chat/:chatId", authMiddleware, async (req, res) => {
 
     if (!chat) return res.status(404).json({ message: "Chat not found" });
 
-    res.json({ data: chat.messages });
+    const decryptedMessages = chat.messages.map((msg) => ({
+      sender: msg.sender,
+      message: decryptMessage(msg.message),
+      timestamp: msg.timestamp,
+    }));
+
+    res.json({ data: decryptedMessages });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

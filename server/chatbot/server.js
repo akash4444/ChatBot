@@ -5,7 +5,6 @@ import express from "express";
 import http from "http";
 import cors from "cors";
 import { Server } from "socket.io";
-import mongoose from "mongoose";
 
 import connectDB from "./config/db.js";
 import chatRoutes from "./routes/chatRoutes.js";
@@ -13,6 +12,7 @@ import authRoutes from "./routes/authRoutes.js";
 import Chat from "./models/chatModel.js";
 import User from "./models/userModel.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { encryptMessage, decryptMessage } from "./utils/crypto.js";
 
 // --------------------
 // Global error handlers
@@ -20,7 +20,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
-
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
 });
@@ -34,7 +33,6 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Express + Middleware
 // --------------------
 const app = express();
-
 const allowedOrigins = process.env.CORS_ORIGIN?.split(",") || [];
 
 app.use(
@@ -44,7 +42,6 @@ app.use(
     credentials: true,
   })
 );
-
 app.use(express.json());
 
 // --------------------
@@ -53,7 +50,7 @@ app.use(express.json());
 connectDB();
 
 // --------------------
-// REST routes (history)
+// REST routes
 // --------------------
 app.use("/chat", chatRoutes);
 app.use("/api", authRoutes);
@@ -93,7 +90,7 @@ io.on("connection", (socket) => {
   // Create chat
   socket.on("createChat", async ({ userId }) => {
     try {
-      const chatId = Date.now().toString(); // or use UUID
+      const chatId = Date.now().toString();
       await Chat.create({ userId, chatId, messages: [] });
       socket.emit("chatCreated", { chatId, messages: [] });
       console.log(`🆕 Chat created: ${chatId} for user ${userId}`);
@@ -112,21 +109,31 @@ io.on("connection", (socket) => {
   // Send message
   socket.on("sendMessage", async ({ chatId, userId, message }) => {
     try {
-      const userMsg = { sender: "user", message, timestamp: new Date() };
+      // Encrypt before saving
+      const encryptedMsg = encryptMessage(message);
+      const userMsg = {
+        sender: "user",
+        message: encryptedMsg,
+        timestamp: new Date(),
+      };
 
-      // Save user message
       await Chat.findOneAndUpdate(
         { userId, chatId },
         { $push: { messages: userMsg } },
         { upsert: true }
       );
 
-      io.to(chatId).emit("newMessage", { chatId, ...userMsg });
+      // Emit decrypted message back to client
+      io.to(chatId).emit("newMessage", {
+        chatId,
+        sender: "user",
+        message,
+        timestamp: userMsg.timestamp,
+      });
+
       io.to(chatId).emit("botTyping", { chatId });
 
-      // --------------------
       // Gemini AI response
-      // --------------------
       let botReplyText = "Sorry, I couldn't generate a response.";
       try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -136,20 +143,27 @@ io.on("connection", (socket) => {
         console.error("Gemini AI error:", err);
       }
 
+      // Encrypt bot reply before saving
+      const encryptedBotMsg = encryptMessage(botReplyText);
       const botMsg = {
         sender: "bot",
-        message: botReplyText,
+        message: encryptedBotMsg,
         timestamp: new Date(),
       };
 
-      // Save bot message
       await Chat.findOneAndUpdate(
         { userId, chatId },
         { $push: { messages: botMsg } },
         { upsert: true }
       );
 
-      io.to(chatId).emit("newMessage", { chatId, ...botMsg });
+      io.to(chatId).emit("newMessage", {
+        chatId,
+        sender: "bot",
+        message: botReplyText,
+        timestamp: botMsg.timestamp,
+      });
+
       io.to(chatId).emit("botStoppedTyping", { chatId });
     } catch (error) {
       console.error("Error sending message:", error);

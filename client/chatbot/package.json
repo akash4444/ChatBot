@@ -13,6 +13,7 @@
     "@tailwindcss/postcss": "^4.1.12",
     "@tailwindcss/typography": "^0.5.16",
     "axios": "^1.11.0",
+    "bcryptjs": "^3.0.2",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.539.0",
     "react": "^19.1.1",
