@@ -57,7 +57,7 @@ export default function Login() {
         />
         <button
           type="submit"
-          className="bg-green-500 text-white p-2 w-full rounded hover:bg-green-600 transition"
+          className="bg-green-500 cursor-pointer text-white p-2 w-full rounded hover:bg-green-600 transition"
         >
           Login
         </button>

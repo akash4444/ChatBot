@@ -70,9 +70,14 @@ export const login = async (req, res) => {
     if (!isMatch)
       return res.status(400).json({ message: "Invalid email or password" });
 
+    // Token valid for 1 minute
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
+      expiresIn: "15m", // 10 seconds
     });
+
+    // Store token in user document
+    user.currentToken = token;
+    await user.save();
 
     res.json({
       token,

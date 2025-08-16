@@ -5,16 +5,17 @@ import Sidebar from "./components/Sidebar.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import { BACKEND_URL } from "./config/config.js";
 import { socket } from "./socket.js";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import SessionModal from "./components/SessionModal.jsx";
 
 export default function App() {
-  // Get user info from localStorage
   const [user, setUser] = useState({
     firstName: localStorage.getItem("firstName") || "",
     lastName: localStorage.getItem("lastName") || "",
     userId: localStorage.getItem("userId") || "",
   });
   const navigate = useNavigate();
+  const [showSessionModal, setShowSessionModal] = useState(false);
 
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState({});
@@ -31,9 +32,25 @@ export default function App() {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  // Fetch chat list on mount
+  // -----------------------
+  // Axios interceptor for 401
+  // -----------------------
+  axiosInstance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response && error.response.status === 401) {
+        // Token invalid or expired → logout
+        setShowSessionModal(true);
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  // -----------------------
+  // Fetch chat list
+  // -----------------------
   useEffect(() => {
-    if (!user.userId) return; // Don't fetch if no user
+    if (!user.userId) return;
 
     const fetchChats = async () => {
       try {
@@ -42,7 +59,6 @@ export default function App() {
         const formatted =
           res.data?.data?.map((chatId) => ({ chatId, messages: [] })) || [];
         setChats(formatted);
-
         if (formatted.length > 0) setActiveChat(formatted[0]);
       } catch (e) {
         console.error("Failed to fetch chat list:", e);
@@ -52,7 +68,9 @@ export default function App() {
     };
     fetchChats();
 
+    // -----------------------
     // Socket listeners
+    // -----------------------
     socket.on("chatCreated", (newChat) => {
       const chatData = { chatId: newChat.chatId, messages: [] };
       setChats((prev) => [chatData, ...prev]);
@@ -81,9 +99,11 @@ export default function App() {
       socket.off("newMessage");
       socket.off("botTyping");
     };
-  }, [user.userId, token]);
+  }, [user.userId, token, navigate]);
 
-  // Fetch messages when activeChat changes
+  // -----------------------
+  // Fetch messages for active chat
+  // -----------------------
   useEffect(() => {
     if (!user.userId || !activeChat?.chatId) return;
 
@@ -104,7 +124,9 @@ export default function App() {
     loadMessages();
   }, [activeChat?.chatId, user.userId, token]);
 
+  // -----------------------
   // Handlers
+  // -----------------------
   const startNewChat = () => socket.emit("createChat", { userId: user.userId });
   const sendMessage = (chatId, text) => {
     socket.emit("sendMessage", { chatId, userId: user.userId, message: text });
@@ -132,8 +154,20 @@ export default function App() {
     }
   };
 
+  const handleSessionModalClose = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
+
+  // -----------------------
+  // JSX
+  // -----------------------
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
+      <SessionModal
+        isOpen={showSessionModal}
+        onClose={handleSessionModalClose}
+      />
       <Sidebar
         chats={chats}
         activeChat={activeChat}
@@ -153,7 +187,7 @@ export default function App() {
           isOpen={isOpen}
           onLogout={() => {
             localStorage.clear();
-            navigate("/login"); // clear all user data
+            navigate("/login");
           }}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
