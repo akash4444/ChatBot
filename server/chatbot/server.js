@@ -9,7 +9,9 @@ import mongoose from "mongoose";
 
 import connectDB from "./config/db.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 import Chat from "./models/chatModel.js";
+import User from "./models/userModel.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // --------------------
@@ -54,6 +56,7 @@ connectDB();
 // REST routes (history)
 // --------------------
 app.use("/chat", chatRoutes);
+app.use("/api", authRoutes);
 
 // 404 fallback
 app.use((req, res) => {

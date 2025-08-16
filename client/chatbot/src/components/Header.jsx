@@ -19,13 +19,13 @@ export default function Header({ user, onLogout, setIsOpen, isOpen }) {
       <div className="flex items-center space-x-4">
         {/* Hide name on small screens */}
         <span className="hidden sm:inline font-medium text-gray-700">
-          {user.name}
+          {`${user.firstName} ${user.lastName}`}
         </span>
 
         {/* Logout button: text on md+, icon only on mobile */}
         <button
           onClick={onLogout}
-          className="flex items-center justify-center bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+          className="flex cursor-pointer items-center justify-center bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
         >
           <span className="sm:hidden">
             <LogOut size={18} />
