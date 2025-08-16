@@ -1,5 +1,5 @@
 import {
-  BrowserRouter as Router,
+  HashRouter as Router,
   Routes,
   Route,
   Navigate,
@@ -20,7 +20,7 @@ const RedirectIfLoggedIn = ({ children }) => {
   return token ? <Navigate to="/chat" replace /> : children;
 };
 
-function App() {
+export default function App() {
   return (
     <Router>
       <Routes>
@@ -59,5 +59,3 @@ function App() {
     </Router>
   );
 }
-
-export default App;
