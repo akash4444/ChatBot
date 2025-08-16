@@ -7,7 +7,6 @@ import {
 import Signup from "./components/SignUp";
 import Login from "./components/Login";
 import MainLayout from "./MainLayout";
-import PrivateRoute from "./components/PrivateRoute";
 
 function App() {
   return (
