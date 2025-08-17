@@ -52,30 +52,13 @@ export default function Header({ user, onLogout, setIsOpen, isOpen }) {
 
       {/* Right Side User Drawer */}
       {showUsers && (
-        <div className="fixed inset-0 z-30 flex justify-end">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black bg-opacity-40"
-            onClick={() => setShowUsers(false)}
-          ></div>
-
-          {/* Drawer */}
-          <div className="relative w-full sm:w-96 h-full bg-white shadow-xl p-4 flex flex-col transition-transform duration-300 ease-in-out">
-            {/* Close Button */}
-            <button
-              className="absolute cursor-pointer top-3 right-3 text-gray-600 hover:text-gray-900"
-              onClick={() => setShowUsers(false)}
-            >
-              <X size={26} />
-            </button>
-
-            {/* User List */}
-            <h2 className="text-lg font-semibold mb-4">People</h2>
-            <div className="flex-1 overflow-y-auto">
-              <UserList userId={user.userId} />
-            </div>
-          </div>
-        </div>
+        <>
+          <UserList
+            userId={user.userId}
+            showUsers={showUsers}
+            setShowUsers={setShowUsers}
+          />
+        </>
       )}
     </>
   );

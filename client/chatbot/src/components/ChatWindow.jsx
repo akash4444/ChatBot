@@ -9,6 +9,7 @@ export default function ChatWindow({
   onSend,
   loadingMessages,
   botTyping,
+  startNewChat,
 }) {
   const [input, setInput] = useState("");
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -35,9 +36,18 @@ export default function ChatWindow({
       {/* Header */}
       <div className="p-2 sm:p-3 border-b bg-white shadow-sm sticky top-0 z-10">
         <h2 className="font-semibold text-lg sm:text-xl text-gray-800 truncate">
-          {activeChat?.chatId
-            ? `Chat #${activeChat.chatId}`
-            : "Select or create a chat"}
+          {activeChat?.chatId ? (
+            `Chat #${activeChat.chatId}`
+          ) : (
+            <div className="">
+              <button
+                className="py-2 px-3 cursor-pointer rounded bg-black text-white hover:bg-gray-800"
+                onClick={startNewChat}
+              >
+                + New Chat
+              </button>
+            </div>
+          )}
         </h2>
       </div>
 
@@ -166,23 +176,25 @@ export default function ChatWindow({
       </div>
 
       {/* Input */}
-      <div className="p-2 sm:p-3 bg-white border-t flex gap-2 sticky bottom-0">
-        <input
-          className="flex-1 border rounded px-2 sm:px-3 py-1.5 sm:py-2 outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Type your message…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          disabled={!activeChat?.chatId}
-        />
-        <button
-          className="px-3 sm:px-4 py-1.5 sm:py-2 rounded cursor-pointer bg-black text-white disabled:opacity-50 hover:bg-gray-800"
-          onClick={handleSend}
-          disabled={!activeChat?.chatId || !input.trim() || botTyping}
-        >
-          Send
-        </button>
-      </div>
+      {activeChat?.chatId && (
+        <div className="p-2 sm:p-3 bg-white border-t flex gap-2 sticky bottom-0">
+          <input
+            className="flex-1 border rounded px-2 sm:px-3 py-1.5 sm:py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Type your message…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            disabled={!activeChat?.chatId}
+          />
+          <button
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded cursor-pointer bg-black text-white disabled:opacity-50 hover:bg-gray-800"
+            onClick={handleSend}
+            disabled={!activeChat?.chatId || !input.trim() || botTyping}
+          >
+            Send
+          </button>
+        </div>
+      )}
     </div>
   );
 }

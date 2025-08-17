@@ -190,6 +190,7 @@ export default function App() {
         <div className="flex-1 overflow-auto">
           <ChatWindow
             activeChat={activeChat}
+            startNewChat={startNewChat}
             onSend={sendMessage}
             loadingMessages={loadingMessages}
             botTyping={botTyping}
