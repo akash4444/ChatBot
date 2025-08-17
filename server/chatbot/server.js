@@ -5,6 +5,7 @@ import express from "express";
 import http from "http";
 import cors from "cors";
 import { Server } from "socket.io";
+import mongoose from "mongoose";
 
 import connectDB from "./config/db.js";
 import chatRoutes from "./routes/chatRoutes.js";
@@ -177,22 +178,22 @@ io.on("connection", (socket) => {
   /////////////////////// pRivate chat //////
 
   // ✅ Create or fetch private chat
+
+  // ✅ Create or get private chat
   socket.on("createPrivateChat", async ({ userId, targetUserId }) => {
     try {
-      // Always sort members so [A,B] == [B,A]
       const members = [userId, targetUserId].sort();
 
-      // Find or create chat atomically
       let chat = await PrivateChat.findOneAndUpdate(
-        { members }, // unique pair
+        { members },
         { $setOnInsert: { members, messages: [] } },
         { upsert: true, new: true }
       );
 
       console.log(`✅ Private chat ready: ${chat._id}`);
 
-      // Decrypt messages before sending to client
       const decryptedMessages = chat.messages.map((m) => ({
+        _id: m._id,
         sender: m.sender,
         text: decryptMessage({
           iv: m.iv,
@@ -200,9 +201,10 @@ io.on("connection", (socket) => {
           authTag: m.authTag,
         }),
         createdAt: m.createdAt,
+        seen: m.seen,
+        reactions: m.reactions,
       }));
 
-      // Emit back to creator
       socket.emit("chatPrivateCreated", {
         chatId: chat._id,
         messages: decryptedMessages,
@@ -213,7 +215,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ✅ Join private chat room
+  // ✅ Join private room
   socket.on("joinPrivateRoom", ({ chatId }) => {
     socket.join(chatId);
     console.log(`🔒 ${socket.id} joined private chat room ${chatId}`);
@@ -236,25 +238,122 @@ io.on("connection", (socket) => {
         content: encrypted.content,
         authTag: encrypted.authTag,
         createdAt: new Date(),
+        seen: false,
+        reactions: [],
       };
 
       chat.messages.push(msgDoc);
       await chat.save();
 
-      // Broadcast decrypted message to all in room
+      const savedMessage = chat.messages[chat.messages.length - 1];
+
+      const decryptedMessage = {
+        _id: savedMessage._id,
+        sender: savedMessage.sender,
+        text: message,
+        createdAt: savedMessage.createdAt,
+        seen: savedMessage.seen,
+        reactions: savedMessage.reactions,
+      };
+
       io.to(chatId).emit("newPrivateMessage", {
         chatId,
-        sender: senderId,
-        message, // decrypted plain text
-        createdAt: msgDoc.createdAt,
+        ...decryptedMessage,
       });
 
       console.log(`💬 Message in chat ${chatId} from ${senderId}`);
     } catch (err) {
       console.error("Error sending private message:", err);
-      socket.emit("errorEvent", { message: "Failed to send private message" });
+      socket.emit("errorEvent", {
+        message: "Failed to send private message",
+      });
     }
   });
+
+  // ✅ Typing indicator
+  socket.on("typing", ({ chatId, userId }) => {
+    socket.to(chatId).emit("userTyping", { chatId, userId });
+  });
+
+  socket.on("stopTyping", ({ chatId, userId }) => {
+    socket.to(chatId).emit("userStoppedTyping", { chatId, userId });
+  });
+
+  // ✅ Mark as seen
+  socket.on("markAsSeen", async ({ chatId, userId }) => {
+    try {
+      const chat = await PrivateChat.findById(chatId);
+      if (!chat) return;
+
+      chat.messages = chat.messages.map((m) =>
+        m.sender.toString() !== userId.toString() && !m.seen
+          ? { ...m.toObject(), seen: true, seenAt: new Date() }
+          : m
+      );
+
+      await chat.save();
+
+      io.to(chatId).emit("messagesSeen", {
+        chatId,
+        seenBy: userId,
+        messages: chat.messages.map((m) => ({
+          _id: m._id,
+          sender: m.sender,
+          createdAt: m.createdAt,
+          seen: m.seen,
+          reactions: m.reactions,
+          text: decryptMessage({
+            iv: m.iv,
+            content: m.content,
+            authTag: m.authTag,
+          }),
+        })),
+      });
+
+      console.log(`👀 Messages in chat ${chatId} seen by ${userId}`);
+    } catch (err) {
+      console.error("Error marking messages as seen:", err);
+      socket.emit("errorEvent", {
+        message: "Failed to mark messages as seen",
+      });
+    }
+  });
+
+  // ✅ Add / update reaction
+  socket.on(
+    "addMessageReaction",
+    async ({ chatId, messageId, userId, emoji }) => {
+      try {
+        const chat = await PrivateChat.findById(chatId);
+        if (!chat) return;
+
+        const message = chat.messages.id(messageId);
+        if (!message) return;
+
+        // Remove previous reaction from same user
+        message.reactions = message.reactions.filter(
+          (r) => r.userId.toString() !== userId.toString()
+        );
+
+        // Add new reaction
+        message.reactions.push({
+          userId: new mongoose.Types.ObjectId(userId),
+          emoji,
+        });
+
+        await chat.save();
+
+        io.to(chatId).emit("messageReactionUpdated", {
+          chatId,
+          messageId,
+          reactions: message.reactions,
+        });
+      } catch (err) {
+        console.error("Error adding reaction:", err);
+        socket.emit("errorEvent", { message: "Failed to add reaction" });
+      }
+    }
+  );
 });
 
 // --------------------
