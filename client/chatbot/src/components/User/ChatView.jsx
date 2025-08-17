@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { X, Smile } from "lucide-react";
 import { socket } from "../../socket";
+import EmojiPicker from "emoji-picker-react";
 
 export default function ChatView({ userId, chatUser, onClose }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [chatId, setChatId] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   useEffect(() => {
     if (!chatUser?._id) return;
@@ -33,6 +36,26 @@ export default function ChatView({ userId, chatUser, onClose }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    // Close emoji picker on outside click
+    const handleClickOutside = (e) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(e.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showEmojiPicker]);
+
   const sendMessage = () => {
     if (!newMessage.trim() || !chatId) return;
     socket.emit("sendPrivateMessage", {
@@ -41,6 +64,19 @@ export default function ChatView({ userId, chatUser, onClose }) {
       message: newMessage,
     });
     setNewMessage("");
+    setShowEmojiPicker(false);
+  };
+
+  // Handle Enter key (Shift+Enter for newline)
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const handleEmojiClick = (emojiData) => {
+    setNewMessage((prev) => prev + emojiData.emoji);
   };
 
   return (
@@ -77,7 +113,6 @@ export default function ChatView({ userId, chatUser, onClose }) {
                 isSender ? "items-end" : "items-start"
               }`}
             >
-              {/* Bubble */}
               <div
                 className={`px-4 py-2 rounded-2xl max-w-[70%] shadow-sm ${
                   isSender
@@ -87,7 +122,6 @@ export default function ChatView({ userId, chatUser, onClose }) {
               >
                 {msg.text}
               </div>
-              {/* Time below */}
               <span
                 className={`text-xs mt-1 ${
                   isSender ? "text-gray-400 pr-1" : "text-gray-500 pl-1"
@@ -105,10 +139,27 @@ export default function ChatView({ userId, chatUser, onClose }) {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t bg-white flex items-center gap-2">
+      <div className="p-3 border-t bg-white flex items-center gap-2 relative">
+        <button
+          onClick={() => setShowEmojiPicker((prev) => !prev)}
+          className="p-2 cursor-pointer text-gray-600 hover:text-blue-500"
+        >
+          <Smile size={22} />
+        </button>
+
+        {showEmojiPicker && (
+          <div
+            ref={emojiPickerRef}
+            className="absolute bottom-14 left-2 z-50 shadow-lg"
+          >
+            <EmojiPicker onEmojiClick={handleEmojiClick} theme="light" />
+          </div>
+        )}
+
         <textarea
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Type a message..."
           rows={1}
           className="flex-1 resize-none p-2 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
