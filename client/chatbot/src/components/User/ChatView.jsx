@@ -188,21 +188,22 @@ export default function ChatView({ userId, chatUser, onClose }) {
             >
               <div className="relative group">
                 <div
-                  className={`relative px-4 py-2 rounded-2xl shadow-sm ${
+                  className={`relative cursor-pointer px-4 py-2 rounded-2xl shadow-sm ${
                     isSender
                       ? "bg-blue-500 text-white rounded-br-none"
                       : "bg-gray-200 text-gray-800 rounded-bl-none"
                   } group`}
+                  onClick={() => setActiveReactionMsg(msg._id)}
                 >
                   {msg.text}
-                  <button
+                  {/* <button
                     onClick={() => setActiveReactionMsg(msg._id)}
                     className={`absolute -bottom-6 opacity-0 group-hover:opacity-100 transition text-gray-500 hover:text-blue-500 cursor-pointer ${
                       isSender ? "left-0" : "right-0"
                     }`}
                   >
                     <SmilePlus size={18} />
-                  </button>
+                  </button> */}
                 </div>
 
                 {/* Reaction picker */}
@@ -217,13 +218,13 @@ export default function ChatView({ userId, chatUser, onClose }) {
                       <button
                         key={i}
                         onClick={() => addReaction(activeReactionMsg, emoji)}
-                        className="text-2xl p-2 hover:bg-white/30 transition-colors duration-200 rounded-full"
+                        className="text-2xl cursor-pointer p-2 hover:bg-white/30 transition-colors duration-200 rounded-full"
                       >
                         {emoji}
                       </button>
                     ))}
                     <button
-                      className="text-2xl p-2 hover:bg-white/30 transition-colors duration-200 rounded-full"
+                      className="text-2xl cursor-pointer p-2 hover:bg-white/30 transition-colors duration-200 rounded-full"
                       onClick={() => setShowFullPicker(!showFullPicker)}
                     >
                       ➕
@@ -272,7 +273,7 @@ export default function ChatView({ userId, chatUser, onClose }) {
       {!isAtBottom && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-20 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg hover:bg-blue-600 transition z-50"
+          className="absolute cursor-pointer bottom-20 right-4 bg-blue-500 text-white p-2 rounded-full shadow-lg hover:bg-blue-600 transition z-50"
         >
           ⬇
         </button>
@@ -309,7 +310,7 @@ export default function ChatView({ userId, chatUser, onClose }) {
         <div className="p-3 border-t bg-white flex items-center gap-2">
           <button
             onClick={() => setShowInputEmojiPicker(!showInputEmojiPicker)}
-            className="text-2xl"
+            className="text-2xl cursor-pointer"
           >
             <Smile />
           </button>

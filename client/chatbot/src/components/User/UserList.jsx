@@ -100,6 +100,12 @@ export default function UserList({ userId, setShowUsers, showUsers }) {
                             {u.firstName} {u.lastName}
                           </p>
                           <p className="text-xs text-gray-500">{u.email}</p>
+                          <button
+                            onClick={() => handleMessage(u)}
+                            className="px-3 py-1.5 cursor-pointer rounded-full text-sm font-medium bg-green-100 text-green-600 hover:bg-green-200 transition"
+                          >
+                            Message
+                          </button>
                         </div>
                       </div>
 
@@ -114,13 +120,6 @@ export default function UserList({ userId, setShowUsers, showUsers }) {
                           }`}
                         >
                           {u.isFollowing ? "Unfollow" : "Follow"}
-                        </button>
-
-                        <button
-                          onClick={() => handleMessage(u)}
-                          className="px-3 py-1.5 cursor-pointer rounded-full text-sm font-medium bg-green-100 text-green-600 hover:bg-green-200 transition"
-                        >
-                          Message
                         </button>
                       </div>
                     </li>
