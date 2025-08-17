@@ -55,7 +55,7 @@ export default function UserList({ userId, setShowUsers, showUsers }) {
 
       {/* Drawer */}
       <div
-        className={`relative w-full sm:w-96 h-full bg-white shadow-xl flex flex-col transition-transform duration-300 ease-in-out ${
+        className={`relative w-full sm:w-[500px] h-full bg-white shadow-xl flex flex-col transition-transform duration-300 ease-in-out ${
           activeChatUser ? "p-0" : "p-4"
         }`}
       >
