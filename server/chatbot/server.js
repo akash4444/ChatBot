@@ -215,6 +215,16 @@ io.on("connection", (socket) => {
     }
   });
 
+  io.on("connection", (socket) => {
+    console.log(`🔌 ${socket.id} connected`);
+
+    // Rejoin all rooms after reconnect
+    socket.on("reconnectChatRooms", async ({ chatIds }) => {
+      chatIds.forEach((chatId) => socket.join(chatId));
+      console.log(`🔄 ${socket.id} rejoined rooms: ${chatIds}`);
+    });
+  });
+
   // ✅ Join private room
   socket.on("joinPrivateRoom", ({ chatId }) => {
     socket.join(chatId);

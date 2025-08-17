@@ -33,6 +33,15 @@ export default function ChatView({ userId, chatUser, onClose }) {
       socket.emit("markAsSeen", { chatId, userId });
     });
 
+    const handleReconnect = () => {
+      console.log("🔄 Reconnected to server");
+      if (chatId) {
+        socket.emit("joinPrivateRoom", { chatId });
+        socket.emit("markAsSeen", { chatId, userId });
+      }
+    };
+    socket.on("connect", handleReconnect);
+
     socket.on(
       "newPrivateMessage",
       ({ chatId, sender, text, createdAt, _id }) => {
