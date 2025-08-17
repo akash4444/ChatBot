@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { axiosInstance } from "./Utils/axiosInstance.js";
 import Header from "./components/Header.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
@@ -27,10 +27,6 @@ export default function App() {
   const token = localStorage.getItem("token");
 
   // Axios instance with token
-  const axiosInstance = axios.create({
-    baseURL: BACKEND_URL,
-    headers: { Authorization: `Bearer ${token}` },
-  });
 
   // -----------------------
   // Axios interceptor for 401

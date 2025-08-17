@@ -72,7 +72,7 @@ export const login = async (req, res) => {
 
     // Token valid for 1 minute
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "15m", // 10 seconds
+      expiresIn: "15m",
     });
 
     // Store token in user document

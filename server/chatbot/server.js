@@ -9,8 +9,10 @@ import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import privateChatRoutes from "./routes/privateChatRoutes.js";
 import Chat from "./models/chatModel.js";
 import User from "./models/userModel.js";
+import PrivateChat from "./models/privateChatModel.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { encryptMessage, decryptMessage } from "./utils/crypto.js";
 
@@ -54,6 +56,7 @@ connectDB();
 // --------------------
 app.use("/chat", chatRoutes);
 app.use("/api", authRoutes);
+app.use("/private", privateChatRoutes);
 
 // 404 fallback
 app.use((req, res) => {
@@ -168,6 +171,88 @@ io.on("connection", (socket) => {
     } catch (error) {
       console.error("Error sending message:", error);
       socket.emit("errorEvent", { message: "Failed to send message" });
+    }
+  });
+
+  /////////////////////// pRivate chat //////
+
+  // ✅ Create or fetch private chat
+  socket.on("createPrivateChat", async ({ userId, targetUserId }) => {
+    try {
+      // Always sort members so [A,B] == [B,A]
+      const members = [userId, targetUserId].sort();
+
+      // Find or create chat atomically
+      let chat = await PrivateChat.findOneAndUpdate(
+        { members }, // unique pair
+        { $setOnInsert: { members, messages: [] } },
+        { upsert: true, new: true }
+      );
+
+      console.log(`✅ Private chat ready: ${chat._id}`);
+
+      // Decrypt messages before sending to client
+      const decryptedMessages = chat.messages.map((m) => ({
+        sender: m.sender,
+        text: decryptMessage({
+          iv: m.iv,
+          content: m.content,
+          authTag: m.authTag,
+        }),
+        createdAt: m.createdAt,
+      }));
+
+      // Emit back to creator
+      socket.emit("chatPrivateCreated", {
+        chatId: chat._id,
+        messages: decryptedMessages,
+      });
+    } catch (error) {
+      console.error("Error creating private chat:", error);
+      socket.emit("errorEvent", { message: "Failed to create chat" });
+    }
+  });
+
+  // ✅ Join private chat room
+  socket.on("joinPrivateRoom", ({ chatId }) => {
+    socket.join(chatId);
+    console.log(`🔒 ${socket.id} joined private chat room ${chatId}`);
+  });
+
+  // ✅ Send private message
+  socket.on("sendPrivateMessage", async ({ chatId, senderId, message }) => {
+    try {
+      const encrypted = encryptMessage(message);
+
+      const chat = await PrivateChat.findById(chatId);
+      if (!chat) {
+        socket.emit("errorEvent", { message: "Private chat not found" });
+        return;
+      }
+
+      const msgDoc = {
+        sender: senderId,
+        iv: encrypted.iv,
+        content: encrypted.content,
+        authTag: encrypted.authTag,
+        createdAt: new Date(),
+      };
+
+      chat.messages.push(msgDoc);
+      await chat.save();
+
+      // Broadcast decrypted message to all in room
+      io.to(chatId).emit("newPrivateMessage", {
+        chatId,
+        sender: senderId,
+        message, // decrypted plain text
+        createdAt: msgDoc.createdAt,
+      });
+
+      console.log(`💬 Message in chat ${chatId} from ${senderId}`);
+    } catch (err) {
+      console.error("Error sending private message:", err);
+      socket.emit("errorEvent", { message: "Failed to send private message" });
     }
   });
 });
