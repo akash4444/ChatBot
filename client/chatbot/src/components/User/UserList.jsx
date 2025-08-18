@@ -3,7 +3,7 @@ import { axiosInstance } from "../../Utils/axiosInstance";
 import ChatView from "./ChatView/ChatView";
 import { X } from "lucide-react";
 
-export default function UserList({ userId, setShowUsers, showUsers }) {
+export default function UserList({ userId, setShowUsers }) {
   const [users, setUsers] = useState([]);
   const [activeChatUser, setActiveChatUser] = useState(null);
   const token = localStorage.getItem("token");

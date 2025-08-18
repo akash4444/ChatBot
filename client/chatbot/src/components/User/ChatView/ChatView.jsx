@@ -17,6 +17,7 @@ export default function ChatView({ userId, chatUser, onClose }) {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const userSentMessageRef = useRef(false);
+  const hasMountedRef = useRef(false);
 
   // ----------------- SOCKET SETUP -----------------
   useEffect(() => {
@@ -28,21 +29,10 @@ export default function ChatView({ userId, chatUser, onClose }) {
       setChatId(chatId);
       setMessages(messages);
       socket.emit("joinPrivateRoom", { chatId });
-      markMessagesSeen(chatId); // mark as seen on open
     });
 
     socket.on("newPrivateMessage", (msg) => {
       setMessages((prev) => [...prev, msg]);
-
-      const container = messagesContainerRef.current;
-      const distanceFromBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight;
-
-      // Scroll if user sent this message or near bottom
-      if (msg.senderId === userId || distanceFromBottom < 50) {
-        userSentMessageRef.current = true;
-        markMessagesSeen(chatId); // mark as seen when user is near bottom
-      }
     });
 
     socket.on("userTyping", ({ userId: typingId }) => {
@@ -64,6 +54,12 @@ export default function ChatView({ userId, chatUser, onClose }) {
       );
     });
 
+    socket.on("messageReplyUpdated", ({ messageId, replies }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === messageId ? { ...msg, replies } : msg))
+      );
+    });
+
     return () => {
       socket.off("chatPrivateCreated");
       socket.off("newPrivateMessage");
@@ -71,8 +67,9 @@ export default function ChatView({ userId, chatUser, onClose }) {
       socket.off("userStoppedTyping");
       socket.off("messagesSeen");
       socket.off("messageReactionUpdated");
+      socket.off("messageReplyUpdated");
     };
-  }, [chatUser, userId, chatId]);
+  }, [chatUser?._id, userId]);
 
   // ----------------- MESSAGE FUNCTIONS -----------------
   const sendMessage = () => {
@@ -84,7 +81,7 @@ export default function ChatView({ userId, chatUser, onClose }) {
     });
     setNewMessage("");
     socket.emit("stopTyping", { chatId, userId });
-    userSentMessageRef.current = true;
+    userSentMessageRef.current = true; // mark so we auto-scroll
   };
 
   const handleTyping = () => {
@@ -101,6 +98,7 @@ export default function ChatView({ userId, chatUser, onClose }) {
 
   // ----------------- SCROLL -----------------
   const scrollToBottom = () => {
+    socket.emit("markAsSeen", { userId, chatId });
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -108,35 +106,37 @@ export default function ChatView({ userId, chatUser, onClose }) {
     if (!messagesContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } =
       messagesContainerRef.current;
-
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
     setShowScrollBtn(distanceFromBottom > 200);
-
-    // mark messages as seen if user scrolls near bottom
-    if (distanceFromBottom < 50) {
-      markMessagesSeen(chatId);
-    }
   };
 
-  const markMessagesSeen = (chatId) => {
-    if (!chatId) return;
-    socket.emit("markAsSeen", { chatId, userId });
-  };
-
-  const addReaction = (messageId, emoji) => {
-    if (!chatId) return;
-    socket.emit("addMessageReaction", { chatId, messageId, userId, emoji });
-  };
-
-  // Auto-scroll only if user sent message or near bottom
+  // ----------------- AUTO SCROLL BEHAVIOR -----------------
   useEffect(() => {
+    if (!messagesContainerRef.current || messages.length === 0) return;
+
+    const container = messagesContainerRef.current;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+
+    // On first mount → scroll to bottom
+    if (!hasMountedRef.current) {
+      scrollToBottom();
+      hasMountedRef.current = true;
+      return;
+    }
+
+    // If I sent the message → always scroll
     if (userSentMessageRef.current) {
       scrollToBottom();
       userSentMessageRef.current = false;
     }
-    handleScroll();
+
+    // If another user sent → don't auto scroll
+    setShowScrollBtn(distanceFromBottom > 100);
   }, [messages]);
 
+  // ----------------- RENDER -----------------
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-xl overflow-hidden relative">
       <ChatHeader
@@ -153,9 +153,24 @@ export default function ChatView({ userId, chatUser, onClose }) {
         <MessagesList
           messages={messages}
           userId={userId}
-          addReaction={addReaction}
+          addReaction={(id, emoji) =>
+            socket.emit("addMessageReaction", {
+              chatId,
+              messageId: id,
+              userId,
+              emoji,
+            })
+          }
           addReplyReaction={() => {}}
-          sendReply={() => {}}
+          sendReply={({ messageId, replyText }) => {
+            if (!replyText.trim()) return;
+            socket.emit("addMessageReply", {
+              chatId,
+              messageId,
+              userId,
+              replyText,
+            });
+          }}
         />
         <div ref={messagesEndRef} />
       </div>

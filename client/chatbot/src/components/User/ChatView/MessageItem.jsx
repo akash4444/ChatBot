@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import TimeDisplay from "./TimeDisplay";
+import Picker from "emoji-picker-react";
+import ChatInput from "./ChatInput";
+import { CornerUpRight } from "lucide-react";
 
 const MessageItem = ({ msg, userId, addReaction, sendReply }) => {
   const isSender = msg.sender === userId || msg.sender?._id === userId;
   const [showReactions, setShowReactions] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [showReplyInput, setShowReplyInput] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  const pickerRef = useRef(null);
+
   const quickEmojis = ["👍", "❤️", "😂", "😮", "😢", "👏"];
 
   const reactionsRef = useRef(null);
@@ -28,6 +35,20 @@ const MessageItem = ({ msg, userId, addReaction, sendReply }) => {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(event.target) &&
+        event.target.id !== "emoji-button"
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -80,12 +101,39 @@ const MessageItem = ({ msg, userId, addReaction, sendReply }) => {
           <button
             className="ml-2 px-2 py-1 text-sm bg-blue-500 text-white rounded-xl"
             onClick={() => {
+              setShowEmojiPicker((prev) => !prev);
+              setShowReactions(false);
+            }}
+          >
+            +
+          </button>
+
+          <button
+            className="ml-2 px-2 py-1 text-sm bg-blue-500 text-white rounded-xl"
+            onClick={() => {
               setShowReplyInput((prev) => !prev);
               setShowReactions(false);
             }}
           >
             Reply
           </button>
+        </div>
+      )}
+
+      {showEmojiPicker && (
+        <div
+          ref={pickerRef}
+          style={{ position: "sticky", bottom: "50px" }} // center horizontally
+        >
+          <Picker
+            onEmojiClick={(emoji) => {
+              addReaction(msg._id, emoji?.emoji);
+              setShowEmojiPicker(false);
+            }}
+            theme="light"
+            height={400}
+            width={320}
+          />
         </div>
       )}
 
@@ -106,50 +154,54 @@ const MessageItem = ({ msg, userId, addReaction, sendReply }) => {
 
       {showReplyInput && (
         <div className="flex gap-2 mt-1">
-          <input
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Write a reply..."
-            className="flex-1 p-2 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-400"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                sendReply(msg._id, replyText);
-                setReplyText("");
-              }
-            }}
-          />
-          <button
-            onClick={() => {
-              sendReply(msg._id, replyText);
+          <ChatInput
+            newMessage={replyText}
+            setNewMessage={setReplyText}
+            sendMessage={() => {
+              sendReply({ messageId: msg._id, replyText });
               setReplyText("");
+              setShowReplyInput(false);
             }}
-            className="px-3 py-1 bg-blue-500 text-white rounded-xl"
-          >
-            Send
-          </button>
+            handleTyping={() => {}}
+          />
         </div>
       )}
 
       {msg.replies?.length > 0 && (
-        <div className="ml-4 mt-2 flex flex-col gap-1">
-          {msg.replies.map((reply) => (
-            <div
-              key={reply._id}
-              className={`flex flex-col max-w-[80%] ${
-                reply.sender === userId ? "ml-auto" : "mr-auto"
-              }`}
-            >
+        <div className="ml-6 mt-2 flex flex-col gap-2">
+          {msg.replies.map((reply) => {
+            const isOwnReply = reply.sender === userId;
+
+            return (
               <div
-                className={`px-3 py-1 rounded-xl shadow-sm ${
-                  reply.sender === userId
-                    ? "bg-blue-400 text-white"
-                    : "bg-gray-200 text-gray-800"
+                key={reply._id}
+                className={`flex items-start gap-2 ${
+                  isOwnReply ? "justify-end" : "justify-start"
                 }`}
               >
-                {reply.content}
+                {!isOwnReply && (
+                  <CornerUpRight size={14} className="mt-1 text-gray-500" />
+                )}
+
+                <div
+                  className={`max-w-[75%] px-3 py-2 rounded-2xl shadow-sm text-sm ${
+                    isOwnReply
+                      ? "bg-blue-500 text-white rounded-br-none"
+                      : "bg-gray-100 text-gray-900 rounded-bl-none"
+                  }`}
+                >
+                  {reply.text}
+                </div>
+
+                {isOwnReply && (
+                  <CornerUpRight
+                    size={14}
+                    className="mt-1 text-gray-400 rotate-180"
+                  />
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

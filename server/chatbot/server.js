@@ -16,6 +16,7 @@ import User from "./models/userModel.js";
 import PrivateChat from "./models/privateChatModel.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { encryptMessage, decryptMessage } from "./utils/crypto.js";
+import { text } from "stream/consumers";
 
 // --------------------
 // Global error handlers
@@ -203,6 +204,17 @@ io.on("connection", (socket) => {
         createdAt: m.createdAt,
         seen: m.seen,
         reactions: m.reactions,
+        replies: m.replies.map((r) => ({
+          _id: r._id,
+          text: decryptMessage({
+            iv: r.iv,
+            content: r.content,
+            authTag: r.authTag,
+          }),
+          createdAt: r.createdAt,
+          reactions: r.reactions,
+          sender: r.sender,
+        })),
       }));
 
       socket.emit("chatPrivateCreated", {
@@ -317,6 +329,17 @@ io.on("connection", (socket) => {
             content: m.content,
             authTag: m.authTag,
           }),
+          replies: m.replies.map((r) => ({
+            _id: r._id,
+            text: decryptMessage({
+              iv: r.iv,
+              content: r.content,
+              authTag: r.authTag,
+            }),
+            createdAt: r.createdAt,
+            reactions: r.reactions,
+            sender: r.sender,
+          })),
         })),
       });
 
@@ -403,7 +426,7 @@ io.on("connection", (socket) => {
           replies: message.replies.map((r) => ({
             _id: r._id,
             sender: r.sender,
-            content: decryptMessage({
+            text: decryptMessage({
               iv: r.iv,
               content: r.content,
               authTag: r.authTag,

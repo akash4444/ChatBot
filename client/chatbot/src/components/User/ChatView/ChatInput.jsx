@@ -57,7 +57,7 @@ const ChatInput = ({
               setNewMessage((prev) => prev + emoji.emoji);
             }}
             theme="light"
-            height={300}
+            height={400}
             width={320}
           />
         </div>
