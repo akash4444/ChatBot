@@ -364,6 +364,101 @@ io.on("connection", (socket) => {
       }
     }
   );
+
+  // Socket handler for adding a reply
+  socket.on(
+    "addMessageReply",
+    async ({ chatId, messageId, userId, replyText }) => {
+      try {
+        if (!replyText?.trim()) return;
+
+        const chat = await PrivateChat.findById(chatId);
+        if (!chat) return;
+
+        const message = chat.messages.id(messageId);
+        if (!message) return;
+
+        // Make sure replies array exists
+        if (!message.replies) message.replies = [];
+
+        // Encrypt reply
+        const { iv, content, authTag } = encryptMessage(replyText);
+
+        // Push reply
+        message.replies.push({
+          sender: new mongoose.Types.ObjectId(userId),
+          content,
+          iv,
+          authTag,
+          createdAt: new Date(),
+          reactions: [],
+        });
+
+        await chat.save();
+
+        // Send decrypted replies
+        io.to(chatId).emit("messageReplyUpdated", {
+          chatId,
+          messageId,
+          replies: message.replies.map((r) => ({
+            _id: r._id,
+            sender: r.sender,
+            content: decryptMessage({
+              iv: r.iv,
+              content: r.content,
+              authTag: r.authTag,
+            }),
+            createdAt: r.createdAt,
+            reactions: r.reactions,
+          })),
+        });
+      } catch (err) {
+        console.error("Error adding reply:", err);
+        socket.emit("errorEvent", { message: "Failed to add reply" });
+      }
+    }
+  );
+
+  socket.on(
+    "addReplyReaction",
+    async ({ chatId, messageId, replyId, userId, emoji }) => {
+      try {
+        const chat = await PrivateChat.findById(chatId);
+        if (!chat) return;
+
+        const message = chat.messages.id(messageId);
+        if (!message || !message.replies) return;
+
+        const reply = message.replies.id(replyId);
+        if (!reply) return;
+
+        // Remove previous reaction from same user
+        reply.reactions = reply.reactions.filter(
+          (r) => r.userId.toString() !== userId.toString()
+        );
+
+        // Add new reaction
+        reply.reactions.push({
+          userId: new mongoose.Types.ObjectId(userId),
+          emoji,
+        });
+
+        await chat.save();
+
+        io.to(chatId).emit("replyReactionUpdated", {
+          chatId,
+          messageId,
+          replyId,
+          reactions: reply.reactions,
+        });
+      } catch (err) {
+        console.error("Error updating reply reaction:", err);
+        socket.emit("errorEvent", {
+          message: "Failed to update reply reaction",
+        });
+      }
+    }
+  );
 });
 
 // --------------------

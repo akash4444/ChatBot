@@ -17,6 +17,22 @@ const privateChatSchema = new mongoose.Schema({
           emoji: { type: String },
         },
       ],
+      replies: [
+        // add this
+        {
+          sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          iv: String,
+          content: String,
+          authTag: String,
+          createdAt: { type: Date, default: Date.now },
+          reactions: [
+            {
+              userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+              emoji: String,
+            },
+          ],
+        },
+      ],
     },
   ],
 });

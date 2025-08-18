@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { axiosInstance } from "../../Utils/axiosInstance";
-import ChatView from "./ChatView";
+import ChatView from "./ChatView/ChatView";
 import { X } from "lucide-react";
 
 export default function UserList({ userId, setShowUsers, showUsers }) {
